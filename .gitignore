@@ -1,0 +1,11 @@
+*.pyc
+.DS_Store
+.env
+.env.*
+.vercel
+.vercel/
+Thumbs.db
+_*.py
+__pycache__/
+_deploy_payload.json
+node_modules/
