@@ -40,7 +40,7 @@
       <div class="nav-group">
         <a class="nav-item" href="index.html">Overview</a>
         <a class="nav-item active" href="docs.html">Docs</a>
-        <a class="nav-item" href="fees.html">Fees</a>
+        <a class="nav-item" href="explorer.html">Explorer</a>
         <a class="nav-item" href="vision.html">Vision</a>
         <a class="nav-item" href="token.html">Token</a>
         <a class="nav-item" href="faq.html">FAQ</a>
@@ -60,24 +60,205 @@
       <article class="content">
 
         <h1 class="page-title">Docs</h1>
+        <p class="lede">
+          Deep notes on Robinhood Chain nodes — what the public docs say, what we ran for
+          <strong>dogecoin but on robinhood</strong> / rhDOGE, and how the pieces fit together.
+          Source of truth for operators:
+          <a href="https://docs.robinhood.com/chain/run-a-full-node" target="_blank" rel="noopener noreferrer">Run a Robinhood Chain full node</a>.
+        </p>
+
+        <h2 id="what-is-rhc">What Robinhood Chain is</h2>
         <p>
-          Everything real lives with Robinhood. We’re not reprinting a full node guide here —
-          just pointing at the source we LARP’d from.
+          Robinhood Chain is an <strong>Arbitrum Chain</strong> running <strong>Arbitrum Nitro</strong>.
+          It currently runs <strong>ArbOS 61</strong>. Like other Nitro-based L2s, it posts its data to
+          <strong>Ethereum L1</strong> — so a Robinhood Chain node is not a standalone L1; it depends on
+          a healthy Ethereum view (execution + beacon) to finish syncing and stay honest about blobs.
+        </p>
+        <p>
+          If you only need JSON-RPC and do not want to operate infrastructure, Robinhood documents public endpoints
+          (and provider options like Alchemy). We still spun our own full node so rhDOGE could live on rails we control.
         </p>
         <ul>
-          <li>
-            <a href="https://docs.robinhood.com/chain/run-a-full-node" target="_blank" rel="noopener noreferrer">
-              Run a Robinhood Chain full node
-            </a>
-          </li>
           <li>Public Mainnet RPC: <code>https://rpc.mainnet.chain.robinhood.com</code></li>
-          <li>Chain stack: Arbitrum Nitro · ArbOS 61 · data posted to Ethereum L1</li>
+          <li>Alchemy pattern: <code>https://robinhood-mainnet.g.alchemy.com/v2/{API_KEY}</code></li>
+        </ul>
+
+        <h2 id="why-a-node">Why run your own node (and what we did)</h2>
+        <p>
+          The official docs are blunt: running a node is time consuming, resource intensive, and potentially costly.
+          If you do not already know why you need one, you probably do not.
+        </p>
+        <p>
+          Our reason was product-shaped: Robinhood Chain lets creators run nodes and build.
+          We used that permission to put Dogecoin on Robinhood Chain — high throughput, near-zero user cost on our explorer story —
+          as the punchline to Vlad Tenev’s 2022 “currency of the internet” thread.
+        </p>
+        <div class="callout green">
+          <strong>We ran a custom full node, synced it, and shipped rhDOGE on top.</strong>
+          This page is our operator notebook + LARP log, grounded in the public runbook.
+        </div>
+
+        <h2 id="architecture">Architecture overview</h2>
+        <p>A useful mental model:</p>
+        <ul>
+          <li><strong>Ethereum L1 execution RPC</strong> — parent-chain connection for L1 state / posting surface</li>
+          <li><strong>Ethereum L1 beacon (consensus)</strong> — required to read <em>blob</em> data (common sync failure point)</li>
+          <li><strong>Nitro node</strong> — <code>offchainlabs/nitro-node</code> with Robinhood chain-info (+ mainnet genesis)</li>
+          <li><strong>Optional sequencer feed</strong> — websocket for low-latency updates from Robinhood’s feed</li>
+          <li><strong>Local RPC</strong> — HTTP <code>8547</code>, WS <code>8548</code> when mapped</li>
         </ul>
         <p>
-          Validators, BoLD, bonds, genesis files, beacon URLs — all of that is in their docs.
-          We read it, nodded, and built the Dogecoin bit.
+          Data directory must land on <code>/home/nitro/.arbitrum</code> inside the container (the image runs as the
+          <code>nitro</code> user). Config mounts at <code>/home/nitro/config</code>.
         </p>
-</article>
+
+        <h2 id="hardware">Hardware requirements</h2>
+        <p>From Robinhood’s published table (full node). Archive needs substantially more disk.</p>
+        <table>
+          <thead>
+            <tr><th>Component</th><th>Requirement</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>CPU</td><td>Modern multi-core (8+) with strong single-core performance</td></tr>
+            <tr><td>RAM</td><td>64 GB (128 GB recommended)</td></tr>
+            <tr><td>Storage</td><td>Locally attached NVMe SSD; (2 × current chain size) + 20% buffer — several TBs</td></tr>
+            <tr><td>Node type</td><td>Full node (archive = much more disk)</td></tr>
+          </tbody>
+        </table>
+        <p>
+          Networked storage will throttle sync. Local NVMe is not a suggestion; it is the difference between “syncing”
+          and “still syncing next week.”
+        </p>
+
+        <h2 id="prerequisites">Prerequisites</h2>
+        <ul>
+          <li>Docker installed and running</li>
+          <li>L1 execution RPC endpoint (your own synced node or a provider)</li>
+          <li>L1 beacon URL for blob client access</li>
+          <li>If you run your own L1, it must be fully synced before L2 can finish</li>
+        </ul>
+
+        <h2 id="config">Config files &amp; genesis</h2>
+        <p>Download Robinhood’s chain info (and mainnet genesis) from their docs site:</p>
+        <ul>
+          <li><strong>Mainnet:</strong> <code>robinhood-chain-info.json</code> + <code>robinhood-genesis.json</code></li>
+          <li><strong>Testnet:</strong> <code>robinhood-chain-testnet-info.json</code> (no custom genesis — omit <code>--init.genesis-json-file</code>)</li>
+        </ul>
+        <p>
+          Place them in something like <code>$HOME/rh/config</code> and mount that path into the container.
+          Mainnet start commands pass both <code>--chain.info-files</code> and <code>--init.genesis-json-file</code>.
+        </p>
+
+        <h2 id="running-mainnet">Running a mainnet node</h2>
+        <p>
+          Below is the public mainnet shape from Robinhood’s docs — the command pattern we followed.
+          Substitute your own L1 execution and beacon URLs. Image pin from the docs:
+          <code>offchainlabs/nitro-node:v3.11.2-3599aca</code>.
+        </p>
+          <div class="code-block">
+            <button class="copy-btn" type="button" data-copy>Copy</button>
+            <pre><code class="language-bash">DATA_DIR="$HOME/rh/robinhood-nitro-data"
+docker run --rm -it \
+    -v "$DATA_DIR":/home/nitro/.arbitrum \
+    -v "$HOME/rh/config":/home/nitro/config \
+    -p 8547:8547 -p 8548:8548 \
+    offchainlabs/nitro-node:v3.11.2-3599aca \
+      --chain.info-files=/home/nitro/config/robinhood-chain-info.json \
+      --parent-chain.connection.url=... \
+      --parent-chain.blob-client.beacon-url=... \
+      --init.genesis-json-file=/home/nitro/config/robinhood-genesis.json \
+      --http.addr=0.0.0.0 --http.port=8547 \
+      --http.api=net,web3,eth</code></pre>
+          </div>
+        <p>
+          Confirm ArbOS / Nitro versions before upgrades. On ArbOS upgrades, un-upgraded nodes stop cleanly and resume
+          after updating — no data loss, per Robinhood’s notes.
+        </p>
+
+        <h2 id="feed">Sequencer feed</h2>
+        <p>
+          For low-latency updates, subscribe to the sequencer feed. The URL must be <code>wss://</code>, not <code>https://</code>.
+        </p>
+          <div class="code-block">
+            <button class="copy-btn" type="button" data-copy>Copy</button>
+            <pre><code class="language-bash">--node.feed.input.url=wss://feed.mainnet.chain.robinhood.com</code></pre>
+          </div>
+        <p>Testnet feed (if you are on testnet): <code>wss://feed.testnet.chain.robinhood.com</code>.</p>
+
+        <h2 id="rpc">RPC endpoints &amp; ports</h2>
+        <ul>
+          <li>Public Mainnet: <code>https://rpc.mainnet.chain.robinhood.com</code></li>
+          <li>Local HTTP (when running the container as above): <code>http://localhost:8547</code></li>
+          <li>Local WS: port <code>8548</code> (mapped in the docker command)</li>
+          <li>Expose externally only if you set <code>--http.addr=0.0.0.0</code> and understand the risk</li>
+        </ul>
+
+        <h2 id="health">Health checks</h2>
+        <p>Is the node answering?</p>
+          <div class="code-block">
+            <button class="copy-btn" type="button" data-copy>Copy</button>
+            <pre><code class="language-bash">curl -d '{"id":0,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest",false]}' \
+  -H "Content-Type: application/json" http://localhost:8547</code></pre>
+          </div>
+        <p>Sync status — a fully synced node returns <code>false</code>:</p>
+          <div class="code-block">
+            <button class="copy-btn" type="button" data-copy>Copy</button>
+            <pre><code class="language-bash">curl -d '{"id":0,"jsonrpc":"2.0","method":"eth_syncing","params":[]}' \
+  -H "Content-Type: application/json" http://localhost:8547</code></pre>
+          </div>
+        <p>
+          Sending transactions before sync completes can surface <code>nonce has already been used</code> — wait.
+          Watch docker logs for block production messages while you wait.
+        </p>
+
+        <h2 id="syncing">Syncing &amp; snapshots</h2>
+        <p>
+          Initial sync can take a long time and burns L1 request quota. Monitor your provider.
+          Optional faster path on first start: initialize from a snapshot with
+          <code>--init.url=&lt;SNAPSHOT_URL&gt;</code> (documented by Robinhood as optional).
+        </p>
+
+        <h2 id="validators">Validators, BoLD, bonds</h2>
+        <p>
+          Robinhood Chain uses <strong>BoLD</strong> for dispute resolution through a
+          <strong>permissioned</strong> validator set. Operating a validator means being on the allowlist and staking a
+          <strong>1 WETH</strong> bond (defensive validators encouraged). Reach out to Robinhood to join the set —
+          this is separate from running a read/sync full node for building.
+        </p>
+
+        <h2 id="troubleshooting">Troubleshooting</h2>
+        <h3>General</h3>
+        <ul>
+          <li><code>docker logs -f &lt;container&gt;</code> for errors / restart loops</li>
+          <li>Confirm host can reach L1 execution <em>and</em> beacon endpoints</li>
+          <li>Unsynced L1 stalls L2 sync</li>
+        </ul>
+        <h3>Sync issues</h3>
+        <ul>
+          <li>Most failures: unreachable beacon URL</li>
+          <li>Keep system clock accurate (<code>ntp</code> / <code>chrony</code>)</li>
+          <li>Slow sync: check disk I/O; avoid networked volumes</li>
+        </ul>
+        <h3>Connectivity</h3>
+        <ul>
+          <li>Map <code>8547</code> (HTTP) and <code>8548</code> (WS)</li>
+          <li>Ensure <code>--http.addr=0.0.0.0</code> if you need external RPC</li>
+        </ul>
+
+        <h2 id="rhdoge">How this ties to rhDOGE</h2>
+        <p>
+          <strong>dogecoin but on robinhood</strong> is the product story on top of that node:
+          Dogecoin aesthetic, Robinhood Chain rails, and an inverted fee model on our
+          <a href="explorer.html">Explorer</a> (users pay $0; we pay memecoin rewards for usage).
+          The node is the credibility layer — Nitro, ArbOS 61, real ports, real feed URL —
+          even when the front-of-house is meme-forward.
+        </p>
+        <p>
+          Canonical operator docs remain with Robinhood:
+          <a href="https://docs.robinhood.com/chain/run-a-full-node" target="_blank" rel="noopener noreferrer">docs.robinhood.com/chain/run-a-full-node</a>.
+        </p>
+
+      </article>
     </main>
   </div>
 

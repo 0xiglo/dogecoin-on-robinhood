@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>FAQ — dogecoin but on robinhood</title>
+  <title>Explorer — dogecoin but on robinhood</title>
   <meta name="description" content="dogecoin but on robinhood. Unofficial community build." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -40,10 +40,10 @@
       <div class="nav-group">
         <a class="nav-item" href="index.html">Overview</a>
         <a class="nav-item" href="docs.html">Docs</a>
-        <a class="nav-item" href="explorer.html">Explorer</a>
+        <a class="nav-item active" href="explorer.html">Explorer</a>
         <a class="nav-item" href="vision.html">Vision</a>
         <a class="nav-item" href="token.html">Token</a>
-        <a class="nav-item active" href="faq.html">FAQ</a>
+        <a class="nav-item" href="faq.html">FAQ</a>
       </div>
 
       <div class="sidebar-social">
@@ -59,33 +59,72 @@
     <main class="main">
       <article class="content">
 
-        <h1 class="page-title">FAQ</h1>
-        <div class="faq">
-          <details>
-            <summary>Is this official Robinhood?</summary>
-            <p>No. Unofficial community / educational parody. Not affiliated with or endorsed by Robinhood.</p>
-          </details>
-          <details>
-            <summary>Did you actually run a node?</summary>
-            <p>
-              We’re LARPing the builder story inspired by the public docs. For a real node, follow
-              <a href="https://docs.robinhood.com/chain/run-a-full-node" target="_blank" rel="noopener noreferrer">Robinhood’s guide</a>.
-            </p>
-          </details>
-          <details>
-            <summary>Where’s the real documentation?</summary>
-            <p>
-              <a href="https://docs.robinhood.com/chain/run-a-full-node" target="_blank" rel="noopener noreferrer">
-                docs.robinhood.com/chain/run-a-full-node
-              </a>
-            </p>
-          </details>
-          <details>
-            <summary>Where’s the GitHub?</summary>
-            <p>Repo is live at <a href="https://github.com/0xiglo/dogecoin-on-robinhood" target="_blank" rel="noopener noreferrer">github.com/0xiglo/dogecoin-on-robinhood</a>.</p>
-          </details>
+        <h1 class="page-title">Explorer</h1>
+        <p class="lede">
+          Lightweight activity view for <strong>dogecoin but on robinhood</strong>.
+          Network fee to users: <strong>$0</strong>. We reverse the model — <strong>we pay users rhDOGE</strong>
+          for routing through our node.
+        </p>
+
+        <div class="callout green">
+          <strong>We pay users our memecoin to use our node.</strong>
+          You do not pay us gas for the privilege. Usage earns rhDOGE rewards (demo explorer — illustrative activity).
         </div>
-</article>
+
+        <div class="stats stats-4">
+          <div class="stat">
+            <div class="label">Network fee</div>
+            <div class="value">$<span id="netFee">0.00</span></div>
+          </div>
+          <div class="stat">
+            <div class="label">User cost</div>
+            <div class="value"><span id="userCost">0</span></div>
+          </div>
+          <div class="stat">
+            <div class="label">Rewards paid</div>
+            <div class="value"><span id="rewardsPaid">0</span> <span class="stat-unit">rhDOGE</span></div>
+          </div>
+          <div class="stat">
+            <div class="label">Tx counted</div>
+            <div class="value"><span id="txCount">0</span></div>
+          </div>
+        </div>
+
+        <div class="explorer-toolbar">
+          <label class="explorer-search">
+            <span class="visually-hidden">Filter</span>
+            <input type="search" id="txFilter" placeholder="Filter by address or hash…" autocomplete="off" />
+          </label>
+          <select id="txStatusFilter" aria-label="Status filter">
+            <option value="all">All status</option>
+            <option value="rewarded">Rewarded</option>
+            <option value="pending">Pending</option>
+            <option value="confirmed">Confirmed</option>
+          </select>
+        </div>
+
+        <div class="explorer-table-wrap">
+          <table class="explorer-table" id="txTable">
+            <thead>
+              <tr>
+                <th>Age</th>
+                <th>Tx</th>
+                <th>From</th>
+                <th>Fee</th>
+                <th>Reward</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="txBody">
+            </tbody>
+          </table>
+        </div>
+        <p class="explorer-footnote">
+          Simulated activity for the inverted fee story. Not live Robinhood Chain indexer data.
+          Node facts live on <a href="docs.html">Docs</a>.
+        </p>
+
+      </article>
     </main>
   </div>
 
